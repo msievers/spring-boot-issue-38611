@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+
+  mongodb-1:
+    image: mongo:6.0.6
+    ports:
+      - 27017:27017
+    command: |
+      mongod --logpath /dev/null --replSet replSet0
+    healthcheck:
+      test: [ "CMD","mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 3s
+      timeout: 3s
+      retries: 0
+      start_period: 3s
+
+  #
+  # When the mongodb-1 container is ready/healthy, initialize the replication set (this is only needed once and will
+  # give `MongoServerError: already initialized` afterward, but it doesn't harm.
+  #
+  mongodb-repl-set-initializer:
+    image: mongo:6.0.6
+    command: ["mongosh", "--host", "mongodb-1:27017", "--eval", "rs.initiate({ _id: 'replSet0', members: [{ _id: 0, host: 'mongodb-1:27017' }] });"]
+    depends_on:
+      mongodb-1:
+        condition: service_healthy
+
+networks:
+  storages:
+    driver: bridge
